@@ -4,9 +4,6 @@ import jakarta.validation.constraints.NotBlank
 
 data class ChangePasswordRequest(
     @field:NotBlank
-    val username: String,
-
-    @field:NotBlank
     val oldPassword: String,
 
     @field:NotBlank

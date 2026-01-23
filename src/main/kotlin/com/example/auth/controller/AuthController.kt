@@ -1,10 +1,13 @@
 package com.example.auth.controller
 
+import com.example.auth.dto.LoginResponse
 import com.example.auth.dto.*
 import com.example.auth.service.AuthService
 import jakarta.annotation.PostConstruct
 import jakarta.validation.Valid
+import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.web.bind.annotation.*
+import jakarta.servlet.http.HttpServletRequest
 
 @RestController
 @RequestMapping("/api/auth")
@@ -19,12 +22,13 @@ class AuthController(
     }
 
     @PostMapping("/login")
-    fun login(@Valid @RequestBody request: LoginRequest): ApiResponse {
+    fun login(@Valid @RequestBody request: LoginRequest): LoginResponse {
         val success = authService.login(request.username, request.password)
         return if (success) {
-            ApiResponse(true, "Login success")
+            val token = authService.generateToken(request.username)
+            LoginResponse(true, "Login success", token, request.username)
         } else {
-            ApiResponse(false, "Invalid username or password")
+            LoginResponse(false, "Invalid username or password")
         }
     }
 
@@ -32,8 +36,10 @@ class AuthController(
     fun changePassword(
         @Valid @RequestBody request: ChangePasswordRequest
     ): ApiResponse {
+        val username = SecurityContextHolder.getContext().authentication?.name
+            ?: return ApiResponse(false, "Unauthorized")
         val success = authService.changePassword(
-            request.username,
+            username,
             request.oldPassword,
             request.newPassword
         )
@@ -42,5 +48,22 @@ class AuthController(
         } else {
             ApiResponse(false, "Old password is incorrect")
         }
+    }
+
+    @PostMapping("/logout")
+    fun logout(request: HttpServletRequest): ApiResponse {
+        val token = getTokenFromRequest(request)
+        return if (token != null && authService.logout(token)) {
+            ApiResponse(true, "Logout successful")
+        } else {
+            ApiResponse(false, "Logout failed")
+        }
+    }
+
+    private fun getTokenFromRequest(request: HttpServletRequest): String? {
+        val bearerToken = request.getHeader("Authorization")
+        return if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+            bearerToken.substring(7)
+        } else null
     }
 }

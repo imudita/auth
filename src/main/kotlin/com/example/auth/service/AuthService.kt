@@ -2,15 +2,18 @@ package com.example.auth.service
 
 import com.example.auth.entity.User
 import com.example.auth.repository.UserRepository
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
+import com.example.auth.security.JwtTokenProvider
+import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
+import com.example.auth.security.TokenBlacklist
 
 @Service
 class AuthService(
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val jwtTokenProvider: JwtTokenProvider,
+    private val passwordEncoder: PasswordEncoder,
+    private val tokenBlacklist: TokenBlacklist
 ) {
-
-    private val passwordEncoder = BCryptPasswordEncoder()
 
     fun login(username: String, password: String): Boolean {
         val user = userRepository.findByUsername(username)
@@ -39,5 +42,19 @@ class AuthService(
             password = passwordEncoder.encode(password)
         )
         userRepository.save(user)
+    }
+
+    fun generateToken(username: String): String {
+        return jwtTokenProvider.generateToken(username)
+    }
+
+    fun logout(token: String): Boolean {
+        return try {
+            val expirationTime = jwtTokenProvider.getTokenExpiration(token)
+            tokenBlacklist.add(token, expirationTime)
+            true
+        } catch (e: Exception) {
+            false
+        }
     }
 }
